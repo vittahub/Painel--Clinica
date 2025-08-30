@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import { User, Plus, Search, Edit, Trash2 } from "lucide-react";
-import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -12,6 +11,23 @@ import { patients, deletePatient } from "../data/patients";
 const Pacientes = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Função para calcular a idade
+  const calculateAge = (birthDate) => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
+      age--;
+    }
+
+    return age;
+  };
 
   // Filtrar pacientes baseado no termo de busca
   const filteredPatients = patients.filter(
@@ -110,46 +126,73 @@ const Pacientes = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPatients.map((patient) => (
-              <Card key={patient.id} className="card-hover">
-                <CardContent className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <img
-                      src={patient.image}
-                      alt={patient.name}
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">
-                        {patient.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-2">
-                        CPF: {patient.cpf}
-                      </p>
-                      <div className="space-y-1 text-sm text-gray-500">
-                        <p>{patient.phone}</p>
-                        <p className="truncate">{patient.email}</p>
-                        <p className="truncate">{patient.address}</p>
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            {/* Cabeçalho da tabela */}
+            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+              <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
+                <div className="col-span-3">Nome</div>
+                <div className="col-span-2">CPF</div>
+                <div className="col-span-2">Telefone</div>
+                <div className="col-span-3">Email</div>
+                <div className="col-span-1">Idade</div>
+                <div className="col-span-1">Ações</div>
+              </div>
+            </div>
+
+            {/* Lista de pacientes */}
+            <div className="divide-y divide-gray-200">
+              {filteredPatients.map((patient) => (
+                <div
+                  key={patient.id}
+                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    {/* Nome e Foto */}
+                    <div className="col-span-3 flex items-center space-x-3">
+                      <img
+                        src={patient.image}
+                        alt={patient.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                      <div>
+                        <h3 className="font-medium text-gray-900">
+                          {patient.name}
+                        </h3>
+                        <p className="text-sm text-gray-500 truncate">
+                          {patient.address}
+                        </p>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="text-sm text-gray-500">
-                      <span className="font-medium">Nascimento:</span>{" "}
-                      {new Date(patient.birthDate).toLocaleDateString("pt-BR")}
+                    {/* CPF */}
+                    <div className="col-span-2 text-sm text-gray-900">
+                      {patient.cpf}
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    {/* Telefone */}
+                    <div className="col-span-2 text-sm text-gray-900">
+                      {patient.phone}
+                    </div>
+
+                    {/* Email */}
+                    <div className="col-span-3 text-sm text-gray-900 truncate">
+                      {patient.email}
+                    </div>
+
+                    {/* Idade */}
+                    <div className="col-span-1 text-sm text-gray-900">
+                      {calculateAge(patient.birthDate)} anos
+                    </div>
+
+                    {/* Ações */}
+                    <div className="col-span-1 flex items-center space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditPatient(patient)}
                         className="text-[#2EA9B0] hover:text-[#2EA9B0] hover:bg-[#2EA9B0]/10"
                       >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Editar
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
@@ -157,14 +200,13 @@ const Pacientes = () => {
                         onClick={() => handleDeletePatient(patient)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Apagar
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
