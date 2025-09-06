@@ -1,4 +1,24 @@
-export const patients = [
+const STORAGE_KEY = "vittahub.patients";
+
+const loadPatientsFromStorage = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const savePatientsToStorage = (data) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+};
+
+export let patients = [
   {
     id: 1,
     name: "João Silva",
@@ -45,16 +65,24 @@ export const patients = [
   },
 ];
 
+const stored = loadPatientsFromStorage();
+if (!stored) {
+  savePatientsToStorage(patients);
+} else {
+  patients = stored;
+}
+
 export const getPatientById = (id) => {
   return patients.find((patient) => patient.id === parseInt(id));
 };
 
 export const addPatient = (patientData) => {
   const newPatient = {
-    id: patients.length + 1,
+    id: patients.length > 0 ? Math.max(...patients.map((p) => p.id)) + 1 : 1,
     ...patientData,
   };
   patients.push(newPatient);
+  savePatientsToStorage(patients);
   return newPatient;
 };
 
@@ -62,6 +90,7 @@ export const updatePatient = (id, updatedData) => {
   const index = patients.findIndex((patient) => patient.id === parseInt(id));
   if (index !== -1) {
     patients[index] = { ...patients[index], ...updatedData };
+    savePatientsToStorage(patients);
     return patients[index];
   }
   return null;
@@ -71,6 +100,7 @@ export const deletePatient = (id) => {
   const index = patients.findIndex((patient) => patient.id === parseInt(id));
   if (index !== -1) {
     const deletedPatient = patients.splice(index, 1)[0];
+    savePatientsToStorage(patients);
     return deletedPatient;
   }
   return null;

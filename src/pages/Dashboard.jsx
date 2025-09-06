@@ -220,44 +220,6 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Ações Rápidas */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ações Rápidas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link to="/medicos/novo">
-                <Button
-                  variant="outline"
-                  className="w-full h-20 flex flex-col items-center justify-center space-y-2"
-                >
-                  <UserCheck className="h-6 w-6 text-[#2EA9B0]" />
-                  <span>Cadastrar Médico</span>
-                </Button>
-              </Link>
-              <Link to="/pacientes/novo">
-                <Button
-                  variant="outline"
-                  className="w-full h-20 flex flex-col items-center justify-center space-y-2"
-                >
-                  <Users className="h-6 w-6 text-[#2EA9B0]" />
-                  <span>Cadastrar Paciente</span>
-                </Button>
-              </Link>
-              <Link to="/agendamentos">
-                <Button
-                  variant="outline"
-                  className="w-full h-20 flex flex-col items-center justify-center space-y-2"
-                >
-                  <Calendar className="h-6 w-6 text-[#2EA9B0]" />
-                  <span>Ver Agendamentos</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </>
   );

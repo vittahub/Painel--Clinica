@@ -15,8 +15,6 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Layout />}>
-
-        git 
           <Route index element={<Dashboard />} />
           <Route path="agendamentos" element={<Agendamentos />} />
           <Route path="medicos" element={<Medicos />} />

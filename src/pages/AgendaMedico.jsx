@@ -8,8 +8,8 @@ import {
   User,
   Phone,
   Edit,
-  Check,
-  X,
+  UserCheck,
+  Eraser,
   Lock,
   FileText,
   MoreHorizontal,
@@ -19,19 +19,39 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../components/ui/dialog";
+import SchedulingModal from "../components/SchedulingModal";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { useToast } from "../components/ui/use-toast";
-import { getDoctorById } from "../data/doctors";
+import { getDoctorById, doctors } from "../data/doctors";
 import {
   getDoctorAgenda,
   updateAppointmentStatus,
   removeAppointment,
   blockTimeSlot,
+  deleteAppointment,
 } from "../data/agenda";
+import { patients } from "../data/patients";
+import { getClinics, getCurrentClinicId } from "../data/clinics";
 
 const AgendaMedico = () => {
   const { toast } = useToast();
@@ -45,6 +65,23 @@ const AgendaMedico = () => {
   const [showNewAppointment, setShowNewAppointment] = useState(false);
   const [showBlockTime, setShowBlockTime] = useState(false);
   const [agenda, setAgenda] = useState([]);
+
+  // Form de agendamento
+  const [formDoctorId, setFormDoctorId] = useState("");
+  const [formPatientId, setFormPatientId] = useState("");
+  const [formPatientName, setFormPatientName] = useState("");
+  const [formPatientQuery, setFormPatientQuery] = useState("");
+  const [showPatientSuggestions, setShowPatientSuggestions] = useState(false);
+  const [formPaymentType, setFormPaymentType] = useState("particular");
+  const [formHealthPlan, setFormHealthPlan] = useState("");
+  const [formProcedure, setFormProcedure] = useState("");
+  const [formProcedures, setFormProcedures] = useState([]);
+  const [formNotes, setFormNotes] = useState("");
+  const [formTime, setFormTime] = useState("");
+  const [formPatientPhone, setFormPatientPhone] = useState("");
+  const [modalMode, setModalMode] = useState("create");
+  const [editingAppointmentId, setEditingAppointmentId] = useState(null);
+  const [modalInitialTime, setModalInitialTime] = useState("");
 
   // Dados do médico (vindos da navegação ou buscados por ID)
   const doctor = location.state?.doctor || getDoctorById(id);
@@ -62,9 +99,9 @@ const AgendaMedico = () => {
       color: "bg-green-100 text-green-800",
     },
     {
-      value: "nao-confirmado",
-      label: "Não Confirmado",
-      color: "bg-red-100 text-red-800",
+      value: "agendado",
+      label: "Agendado",
+      color: "bg-gray-100 text-gray-800",
     },
     {
       value: "atendido",
@@ -74,7 +111,7 @@ const AgendaMedico = () => {
     {
       value: "cancelado",
       label: "Cancelado",
-      color: "bg-gray-100 text-gray-800",
+      color: "bg-red-100 text-red-800",
     },
     {
       value: "reagendado",
@@ -91,13 +128,26 @@ const AgendaMedico = () => {
     }
   }, [doctor, selectedDate]);
 
+  // Sincronizar nome do paciente quando selecionado
+  useEffect(() => {
+    if (formPatientId) {
+      const p = patients.find((pt) => pt.id === parseInt(formPatientId));
+      if (p) {
+        setFormPatientName(p.name);
+        setFormPatientQuery(`${p.name} - ${p.cpf || ""}`);
+        setFormPatientPhone(p.phone || "");
+      } else {
+        setFormPatientName("");
+      }
+    }
+  }, [formPatientId]);
+
   // Filtrar agenda baseado no filtro ativo
   const filteredAgenda = agenda.filter((item) => {
     if (activeFilter === "todos") return true;
     if (activeFilter === "em-espera") return item.status === "em-espera";
     if (activeFilter === "confirmado") return item.status === "confirmado";
-    if (activeFilter === "nao-confirmado")
-      return item.status === "nao-confirmado";
+    if (activeFilter === "agendado") return item.status === "agendado";
     if (activeFilter === "atendido") return item.status === "atendido";
     if (activeFilter === "cancelado") return item.status === "cancelado";
     if (activeFilter === "reagendado") return item.status === "reagendado";
@@ -117,12 +167,22 @@ const AgendaMedico = () => {
 
   // Função para agendar novo paciente
   const scheduleNewPatient = (timeSlot) => {
-    toast({
-      title: "🚧 Funcionalidade em desenvolvimento",
-      description:
-        "A funcionalidade de agendamento será implementada em breve.",
-      duration: 3000,
-    });
+    // Abrir modal já com horário selecionado
+    setFormTime(timeSlot.time);
+    setModalInitialTime(timeSlot.time);
+    setFormDoctorId(String(doctor.id));
+    setFormPatientPhone("");
+    setFormPatientId("");
+    setFormPatientName("");
+    setFormPatientQuery("");
+    setFormPaymentType("particular");
+    setFormHealthPlan("");
+    setFormProcedure("");
+    setFormProcedures([]);
+    setFormNotes("");
+    setModalMode("create");
+    setEditingAppointmentId(null);
+    setShowNewAppointment(true);
   };
 
   // Função para bloquear horário
@@ -156,13 +216,116 @@ const AgendaMedico = () => {
     }
   };
 
-  // Função para editar agendamento
+  // 'Novo Horário' é outra funcionalidade: abrirá futuro fluxo específico, sem modal de agendamento
+  const handleNewSlotClick = () => {
+    // placeholder: implementar fluxo de criação de horário customizado futuramente
+  };
+
+  const availableTimes = (() => {
+    const targetDoctorId = formDoctorId ? parseInt(formDoctorId) : doctor?.id;
+    if (!targetDoctorId || !selectedDate) return [];
+    const ag = getDoctorAgenda(targetDoctorId, selectedDate);
+    return ag.filter((i) => i.type === "available").map((i) => i.time);
+  })();
+
+  const handleCreateAppointment = (e) => {
+    e?.preventDefault?.();
+    try {
+      const clinics = getClinics();
+      const currentClinicId = getCurrentClinicId();
+      const clinic = clinics.find((c) => c.id === currentClinicId);
+      const resolvedDoctorId = formDoctorId
+        ? parseInt(formDoctorId)
+        : doctor.id;
+      const resolvedDoctor = getDoctorById(resolvedDoctorId);
+
+      if (!selectedDate || !formTime) {
+        toast({
+          title: "Selecione data e horário",
+          description: "Escolha um horário disponível para o agendamento.",
+          duration: 2000,
+        });
+        return;
+      }
+
+      const finalPatient = formPatientId
+        ? patients.find((p) => p.id === parseInt(formPatientId))
+        : null;
+
+      if (!finalPatient && !formPatientName.trim()) {
+        toast({
+          title: "Informe o paciente",
+          description: "Selecione um paciente ou digite o nome.",
+          duration: 2000,
+        });
+        return;
+      }
+
+      const appt = createAppointment({
+        clinicId: clinic?.id || 0,
+        clinicName: clinic?.name || "",
+        doctorId: resolvedDoctorId,
+        doctorName: resolvedDoctor?.name || "",
+        patientId: finalPatient ? finalPatient.id : 0,
+        patientName: finalPatient ? finalPatient.name : formPatientName,
+        date: selectedDate,
+        time: formTime,
+        procedure: formProcedure || "Consulta",
+        procedures: formProcedures,
+        status: "confirmado",
+        paymentType: formPaymentType,
+        healthPlan: formPaymentType === "plano" ? formHealthPlan : "",
+        notes: formNotes,
+      });
+
+      // Atualizar agenda local
+      const updatedAgenda = getDoctorAgenda(doctor.id, selectedDate);
+      setAgenda(updatedAgenda);
+
+      setShowNewAppointment(false);
+      toast({
+        title: "Agendamento criado!",
+        description: `${appt.patientName} - ${formTime}`,
+        duration: 2000,
+      });
+    } catch (err) {
+      toast({
+        title: "Erro ao agendar",
+        description: "Tente novamente.",
+        duration: 2000,
+      });
+    }
+  };
+
+  // Função para editar agendamento (abre o modal pré-preenchido)
   const editAppointment = (appointment) => {
-    toast({
-      title: "🚧 Funcionalidade em desenvolvimento",
-      description: "A funcionalidade de edição será implementada em breve.",
-      duration: 3000,
-    });
+    setModalMode("edit");
+    setEditingAppointmentId(appointment.id);
+    setFormDoctorId(String(doctor.id));
+    setFormTime(appointment.time);
+    setModalInitialTime(appointment.time);
+    setFormPatientId(
+      appointment.patientId ? String(appointment.patientId) : ""
+    );
+    setFormPatientName(appointment.patient?.name || "");
+    setFormPatientQuery(
+      appointment.patient?.name
+        ? `${appointment.patient.name} - ${appointment.patient.phone || ""}`
+        : ""
+    );
+    setFormPatientPhone(appointment.patient?.phone || "");
+    setFormProcedures(
+      Array.isArray(appointment.procedures)
+        ? appointment.procedures
+        : appointment.procedure
+        ? [appointment.procedure]
+        : []
+    );
+    setFormProcedure("");
+    setFormPaymentType(appointment.paymentType || "particular");
+    setFormHealthPlan(appointment.healthPlan || "");
+    setFormNotes(appointment.notes || "");
+    setShowNewAppointment(true);
   };
 
   // Função para marcar como atendido
@@ -170,15 +333,32 @@ const AgendaMedico = () => {
     handleUpdateAppointmentStatus(appointment.id, "atendido");
   };
 
-  // Função para remover da agenda
+  // Função para remover paciente (liberar horário) com confirmação
   const removeFromAgenda = (appointment) => {
-    const updatedAgenda = removeAppointment(agenda, appointment.id);
-    setAgenda(updatedAgenda);
-    toast({
-      title: "Agendamento removido!",
-      description: "O agendamento foi removido da agenda com sucesso.",
-      duration: 2000,
-    });
+    const confirmed = window.confirm(
+      `Remover o paciente ${
+        appointment.patient?.name || "deste horário"
+      }? O horário ficará disponível.`
+    );
+    if (!confirmed) return;
+
+    // Remove do armazenamento persistente e atualiza a agenda visual
+    try {
+      deleteAppointment(appointment.id);
+      const updated = getDoctorAgenda(doctor.id, selectedDate);
+      setAgenda(updated);
+      toast({
+        title: "Paciente removido",
+        description: "O horário foi liberado.",
+        duration: 2000,
+      });
+    } catch (e) {
+      toast({
+        title: "Erro ao remover",
+        description: "Tente novamente.",
+        duration: 2000,
+      });
+    }
   };
 
   // Função para formatar data
@@ -232,9 +412,7 @@ const AgendaMedico = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {doctor.name}
               </h1>
-              <p className="text-gray-600">
-                {doctor.specialty}
-              </p>
+              <p className="text-gray-600">{doctor.specialty}</p>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -257,7 +435,7 @@ const AgendaMedico = () => {
               </div>
 
               <Button
-                onClick={() => setShowNewAppointment(true)}
+                onClick={handleNewSlotClick}
                 className="flex items-center space-x-2"
               >
                 <Plus className="h-4 w-4" />
@@ -341,15 +519,62 @@ const AgendaMedico = () => {
                             alt={item.patient.name}
                             className="w-10 h-10 rounded-full object-cover"
                           />
-                          <div>
-                            <h3 className="font-semibold text-gray-900">
-                              {item.patient.name}
-                            </h3>
-                            <div className="flex items-center space-x-1 text-sm text-gray-500">
-                              <Phone className="h-3 w-3" />
-                              <span>{item.patient.phone}</span>
+                          <button
+                            type="button"
+                            className="text-left"
+                            onClick={() => {
+                              // abrir modal de agendamento pré-preenchido para re-agendar/editar rápido
+                              setModalMode("edit");
+                              setEditingAppointmentId(item.id);
+                              setFormDoctorId(String(doctor.id));
+                              setFormTime(item.time);
+                              setFormPatientId(
+                                item.patientId ? String(item.patientId) : ""
+                              );
+                              setFormPatientName(item.patient?.name || "");
+                              setFormPatientQuery(
+                                item.patient?.name
+                                  ? `${item.patient.name} - ${
+                                      item.patient.phone || ""
+                                    }`
+                                  : ""
+                              );
+                              setFormPatientPhone(item.patient?.phone || "");
+                              setFormProcedures(
+                                Array.isArray(item.procedures)
+                                  ? item.procedures
+                                  : item.procedure
+                                  ? [item.procedure]
+                                  : []
+                              );
+                              setFormProcedure("");
+                              setFormPaymentType(
+                                item.paymentType || "particular"
+                              );
+                              setFormHealthPlan(item.healthPlan || "");
+                              setFormNotes(item.notes || "");
+                              // prioridade se existir no item futuramente
+                              setShowNewAppointment(true);
+                            }}
+                          >
+                            <div>
+                              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                                {item.patient.name}
+                                {item.notes && item.notes.trim() !== "" && (
+                                  <span
+                                    title="Observações presentes"
+                                    className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold"
+                                  >
+                                    !
+                                  </span>
+                                )}
+                              </h3>
+                              <div className="flex items-center space-x-1 text-sm text-gray-500">
+                                <Phone className="h-3 w-3" />
+                                <span>{item.patient.phone}</span>
+                              </div>
                             </div>
-                          </div>
+                          </button>
                         </>
                       ) : item.type === "available" ? (
                         <div className="flex items-center space-x-3">
@@ -380,9 +605,20 @@ const AgendaMedico = () => {
                     {/* Procedimento */}
                     <div className="text-center">
                       {item.type === "appointment" ? (
-                        <span className="text-sm text-gray-600 font-medium">
-                          {item.procedure}
-                        </span>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          {String(item.procedure)
+                            .split(",")
+                            .map((p) => p.trim())
+                            .filter(Boolean)
+                            .map((p) => (
+                              <span
+                                key={`${item.id}-${p}`}
+                                className="inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700 border border-gray-200"
+                              >
+                                {p}
+                              </span>
+                            ))}
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-400">-</span>
                       )}
@@ -440,15 +676,7 @@ const AgendaMedico = () => {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => markAsAttended(item)}
-                            className="p-2 text-green-600 hover:text-green-700"
-                            title="Marcar como Atendido"
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
+
                           <Button
                             variant="outline"
                             size="sm"
@@ -456,7 +684,16 @@ const AgendaMedico = () => {
                             className="p-2 text-red-600 hover:text-red-700"
                             title="Remover da Agenda"
                           >
-                            <X className="h-4 w-4" />
+                            <Eraser className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => markAsAttended(item)}
+                            className="p-2 text-blue-600 hover:text-blue-700"
+                            title="Marcar como Atendido"
+                          >
+                            <UserCheck className="h-4 w-4" />
                           </Button>
                         </>
                       )}
@@ -478,7 +715,7 @@ const AgendaMedico = () => {
                             className="p-2"
                             title="Bloquear Horário"
                           >
-                            <X className="h-4 w-4" />
+                            <Lock className="h-4 w-4" />
                           </Button>
                         </>
                       )}
@@ -494,17 +731,16 @@ const AgendaMedico = () => {
                         </Button>
                       )}
 
-                      {item.type === "appointment" &&
-                        item.status === "atendido" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="p-2"
-                            title="Prontuário"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        )}
+                      {item.type === "appointment" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="p-2 text-blue-600 hover:text-blue-700"
+                          title="Ficha do Paciente"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -530,6 +766,29 @@ const AgendaMedico = () => {
           </div>
         </div>
       </div>
+      {/* Modal de Novo Agendamento (apenas quando vindo do botão Agendar nos slots) */}
+      <SchedulingModal
+        open={showNewAppointment}
+        onOpenChange={setShowNewAppointment}
+        initialDoctorId={doctor?.id}
+        initialDate={selectedDate}
+        dateDisabled={true}
+        initialTime={modalInitialTime || formTime}
+        initialPatientId={formPatientId}
+        initialPatientName={formPatientName}
+        initialPatientPhone={formPatientPhone}
+        initialPaymentType={formPaymentType}
+        initialHealthPlan={formHealthPlan}
+        initialNotes={formNotes}
+        initialProcedures={formProcedures}
+        mode={modalMode}
+        appointmentId={editingAppointmentId}
+        onCreated={() => {
+          const updated = getDoctorAgenda(doctor.id, selectedDate);
+          setAgenda(updated);
+        }}
+        onNavigateToNewPatient={() => navigate("/pacientes/novo")}
+      />
     </>
   );
 };
