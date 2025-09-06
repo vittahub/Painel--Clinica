@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -14,10 +14,12 @@ import {
   FileText,
   MoreHorizontal,
 } from "lucide-react";
+import { ClockPlus } from "../components/layout/Icons";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
+import DatePicker from "../components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -82,6 +84,9 @@ const AgendaMedico = () => {
   const [modalMode, setModalMode] = useState("create");
   const [editingAppointmentId, setEditingAppointmentId] = useState(null);
   const [modalInitialTime, setModalInitialTime] = useState("");
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [appointmentPendingRemoval, setAppointmentPendingRemoval] =
+    useState(null);
 
   // Dados do médico (vindos da navegação ou buscados por ID)
   const doctor = location.state?.doctor || getDoctorById(id);
@@ -127,6 +132,8 @@ const AgendaMedico = () => {
       setAgenda(agendaData);
     }
   }, [doctor, selectedDate]);
+
+  // Realtime removido a pedido
 
   // Sincronizar nome do paciente quando selecionado
   useEffect(() => {
@@ -203,22 +210,41 @@ const AgendaMedico = () => {
   const blockEntireDay = () => {
     const reason = prompt("Motivo do bloqueio do dia:");
     if (reason) {
-      const updatedAgenda = agenda.map((item) => ({
-        ...item,
-        type: "blocked",
-        reason: reason,
-      }));
+      const updatedAgenda = agenda.map((item) => {
+        if (item.type === "available") {
+          return {
+            ...item,
+            type: "blocked",
+            reason: reason,
+          };
+        }
+        return item; // mantém agendamentos e bloqueios existentes como estão
+      });
       setAgenda(updatedAgenda);
       toast({
         title: "Dia bloqueado!",
-        description: "A agenda do dia foi bloqueada com sucesso.",
+        description:
+          "Somente os horários vazios foram bloqueados. Agendamentos foram mantidos.",
       });
     }
   };
 
-  // 'Novo Horário' é outra funcionalidade: abrirá futuro fluxo específico, sem modal de agendamento
+  // 'Novo Horário': abrir o mesmo modal, mas com horário manual (sem sugestões)
   const handleNewSlotClick = () => {
-    // placeholder: implementar fluxo de criação de horário customizado futuramente
+    setModalMode("create");
+    setEditingAppointmentId(null);
+    setFormDoctorId(String(doctor.id));
+    setFormTime(""); // horário será digitado manualmente
+    setFormPatientId("");
+    setFormPatientName("");
+    setFormPatientQuery("");
+    setFormPatientPhone("");
+    setFormPaymentType("particular");
+    setFormHealthPlan("");
+    setFormProcedure("");
+    setFormProcedures([]);
+    setFormNotes("");
+    setShowNewAppointment(true);
   };
 
   const availableTimes = (() => {
@@ -333,18 +359,17 @@ const AgendaMedico = () => {
     handleUpdateAppointmentStatus(appointment.id, "atendido");
   };
 
-  // Função para remover paciente (liberar horário) com confirmação
-  const removeFromAgenda = (appointment) => {
-    const confirmed = window.confirm(
-      `Remover o paciente ${
-        appointment.patient?.name || "deste horário"
-      }? O horário ficará disponível.`
-    );
-    if (!confirmed) return;
+  // Abrir diálogo de confirmação para remover paciente
+  const askRemoveFromAgenda = (appointment) => {
+    setAppointmentPendingRemoval(appointment);
+    setConfirmRemoveOpen(true);
+  };
 
-    // Remove do armazenamento persistente e atualiza a agenda visual
+  // Remover paciente (liberar horário)
+  const removeFromAgenda = () => {
+    if (!appointmentPendingRemoval) return;
     try {
-      deleteAppointment(appointment.id);
+      deleteAppointment(appointmentPendingRemoval.id);
       const updated = getDoctorAgenda(doctor.id, selectedDate);
       setAgenda(updated);
       toast({
@@ -358,6 +383,9 @@ const AgendaMedico = () => {
         description: "Tente novamente.",
         duration: 2000,
       });
+    } finally {
+      setConfirmRemoveOpen(false);
+      setAppointmentPendingRemoval(null);
     }
   };
 
@@ -426,19 +454,14 @@ const AgendaMedico = () => {
               </Button>
 
               <div className="flex items-center space-x-2">
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-40"
-                />
+                <DatePicker value={selectedDate} onChange={setSelectedDate} />
               </div>
 
               <Button
                 onClick={handleNewSlotClick}
                 className="flex items-center space-x-2"
               >
-                <Plus className="h-4 w-4" />
+                <ClockPlus className="h-4 w-4" />
                 <span>Novo Horário</span>
               </Button>
             </div>
@@ -680,7 +703,7 @@ const AgendaMedico = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => removeFromAgenda(item)}
+                            onClick={() => askRemoveFromAgenda(item)}
                             className="p-2 text-red-600 hover:text-red-700"
                             title="Remover da Agenda"
                           >
@@ -702,7 +725,6 @@ const AgendaMedico = () => {
                         <>
                           <Button
                             onClick={() => scheduleNewPatient(item)}
-                            className="bg-purple-500 hover:bg-purple-600 text-white"
                             size="sm"
                           >
                             <Plus className="h-4 w-4 mr-1" />
@@ -735,7 +757,7 @@ const AgendaMedico = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="p-2 text-blue-600 hover:text-blue-700"
+                          className="p-2 text-gray-600 hover:text-gray-700"
                           title="Ficha do Paciente"
                         >
                           <FileText className="h-4 w-4" />
@@ -774,6 +796,7 @@ const AgendaMedico = () => {
         initialDate={selectedDate}
         dateDisabled={true}
         initialTime={modalInitialTime || formTime}
+        timeManual={modalMode === "create" && formTime === ""}
         initialPatientId={formPatientId}
         initialPatientName={formPatientName}
         initialPatientPhone={formPatientPhone}
@@ -789,6 +812,40 @@ const AgendaMedico = () => {
         }}
         onNavigateToNewPatient={() => navigate("/pacientes/novo")}
       />
+      {/* Dialogo de confirmação de remoção */}
+      <Dialog open={confirmRemoveOpen} onOpenChange={setConfirmRemoveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover paciente</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-center">
+            <p className="text-gray-700">
+              Tem certeza que deseja remover{" "}
+              <span className="font-semibold">
+                {appointmentPendingRemoval?.patient?.name || "o paciente"}
+              </span>{" "}
+              deste horário?
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              O horário ficará disponível para novos agendamentos.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmRemoveOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={removeFromAgenda}
+            >
+              Remover
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

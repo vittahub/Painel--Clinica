@@ -68,22 +68,35 @@ export const createAppointment = ({
   };
   current.push(newAppt);
   saveAppointments(current);
+
   return newAppt;
 };
 
 export const listAppointments = (filter = {}) => {
   const all = loadAppointments();
-  return all.filter((a) => {
-    return (
+  return all.filter(
+    (a) =>
       (filter.clinicId ? a.clinicId === filter.clinicId : true) &&
       (filter.doctorId ? a.doctorId === filter.doctorId : true) &&
       (filter.patientId ? a.patientId === filter.patientId : true) &&
       (filter.date ? a.date === filter.date : true)
-    );
-  });
+  );
 };
 
 // Função para gerar horários baseados nas configurações do médico
+// Parse date string (YYYY-MM-DD) in local timezone to avoid UTC shifts
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  const parts = String(dateStr)
+    .split("-")
+    .map((n) => parseInt(n, 10));
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateStr);
+};
+
 export const generateAgendaSlots = (doctorId, date) => {
   const doctor = getDoctorById(doctorId);
   if (!doctor) return [];
@@ -96,8 +109,8 @@ export const generateAgendaSlots = (doctorId, date) => {
   };
   const { startTime, endTime, interval } = workingHours;
 
-  // Verificar se é um dia útil para o médico
-  const dayOfWeek = new Date(date).getDay();
+  // Verificar se é um dia útil para o médico (usando fuso local)
+  const dayOfWeek = parseLocalDate(date).getDay();
   const dayNames = [
     "sunday",
     "monday",

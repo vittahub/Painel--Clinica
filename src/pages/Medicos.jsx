@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { UserCheck, Plus, Search, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";

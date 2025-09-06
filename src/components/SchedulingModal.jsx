@@ -1,5 +1,11 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Plus, X } from "lucide-react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
+import { Plus, UserPlus, X } from "lucide-react";
 
 import {
   Dialog,
@@ -28,6 +34,7 @@ import {
   createAppointment,
   getDoctorAgenda,
   updateAppointment,
+  listAppointments,
 } from "../data/agenda";
 import { getClinics, getCurrentClinicId } from "../data/clinics";
 
@@ -38,6 +45,7 @@ const SchedulingModal = ({
   initialDate,
   dateDisabled = false,
   initialTime = "",
+  timeManual = false,
   initialPatientId = "",
   initialPatientName = "",
   initialPatientPhone = "",
@@ -169,6 +177,19 @@ const SchedulingModal = ({
     };
   }, [open]);
 
+  // Helpers memorizados
+  const selectPatient = useCallback((p) => {
+    setFormPatientId(String(p.id));
+    setFormPatientName(p.name);
+    setFormPatientQuery(p.name);
+    setFormPatientPhone(p.phone || "");
+    setShowPatientSuggestions(false);
+  }, []);
+
+  const removeProcedure = useCallback((name) => {
+    setFormProcedures((prev) => prev.filter((x) => x !== name));
+  }, []);
+
   const availableTimes = useMemo(() => {
     const targetDoctorId = formDoctorId ? parseInt(formDoctorId) : null;
     if (!targetDoctorId || !formDate) return [];
@@ -194,6 +215,19 @@ const SchedulingModal = ({
       }
       if (!formDate || !formTime) {
         toast({ title: "Selecione data e horário", duration: 2000 });
+        return;
+      }
+      // Se horário é manual, garantir que não existe agendamento no mesmo horário
+      const existing = listAppointments({
+        doctorId: resolvedDoctorId,
+        date: formDate,
+      }).some((a) => a.time === formTime);
+      if (existing) {
+        toast({
+          title: "Horário ocupado",
+          description: "Já existe um paciente nesse horário.",
+          duration: 2500,
+        });
         return;
       }
       const finalPatient = formPatientId
@@ -305,28 +339,37 @@ const SchedulingModal = ({
             </div>
             <div className="sm:col-span-3">
               <Label>Horário</Label>
-              <Select value={formTime} onValueChange={setFormTime}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecione o horário" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTimes.length === 0 ? (
-                    <SelectItem value="" disabled>
-                      Sem horários disponíveis
-                    </SelectItem>
-                  ) : (
-                    availableTimes.map((t) => {
-                      const isCurrent = t === formTime;
-                      return (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                          {mode === "edit" && isCurrent ? " (atual)" : ""}
-                        </SelectItem>
-                      );
-                    })
-                  )}
-                </SelectContent>
-              </Select>
+              {timeManual ? (
+                <Input
+                  className="mt-1 focus:ring-2 focus:ring-[#2EA9B0]"
+                  type="time"
+                  value={formTime}
+                  onChange={(e) => setFormTime(e.target.value)}
+                />
+              ) : (
+                <Select value={formTime} onValueChange={setFormTime}>
+                  <SelectTrigger className="mt-1 focus:ring-2 focus:ring-[#2EA9B0]">
+                    <SelectValue placeholder="Selecione o horário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTimes.length === 0 ? (
+                      <SelectItem value="no-slots" disabled>
+                        Sem horários disponíveis
+                      </SelectItem>
+                    ) : (
+                      availableTimes.map((t) => {
+                        const isCurrent = t === formTime;
+                        return (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                            {mode === "edit" && isCurrent ? " (atual)" : ""}
+                          </SelectItem>
+                        );
+                      })
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Linha 2: Paciente (nome), +, Telefone */}
@@ -377,13 +420,7 @@ const SchedulingModal = ({
                               key={p.id}
                               className="w-full text-left px-3 py-2 hover:bg-gray-50"
                               onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setFormPatientId(String(p.id));
-                                setFormPatientName(p.name);
-                                setFormPatientQuery(p.name);
-                                setFormPatientPhone(p.phone || "");
-                                setShowPatientSuggestions(false);
-                              }}
+                              onClick={() => selectPatient(p)}
                             >
                               <div className="font-medium text-gray-900">
                                 {p.name}
@@ -428,7 +465,7 @@ const SchedulingModal = ({
                     }}
                     title="Cadastrar novo paciente"
                   >
-                    <Plus className="h-4 w-4" />
+                    <UserPlus className="h-4 w-4" />
                   </Button>
                 </div>
                 <div className="sm:col-span-4 ml-2">
@@ -517,11 +554,7 @@ const SchedulingModal = ({
                       <button
                         type="button"
                         className="text-gray-400 hover:text-gray-600"
-                        onClick={() =>
-                          setFormProcedures((prev) =>
-                            prev.filter((x) => x !== p)
-                          )
-                        }
+                        onClick={() => removeProcedure(p)}
                         aria-label={`Remover ${p}`}
                       >
                         <X className="h-3 w-3" />
