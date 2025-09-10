@@ -235,6 +235,7 @@ const AgendaMedico = () => {
     setEditingAppointmentId(null);
     setFormDoctorId(String(doctor.id));
     setFormTime(""); // horário será digitado manualmente
+    setModalInitialTime(""); // garantir que o modal também tenha horário vazio
     setFormPatientId("");
     setFormPatientName("");
     setFormPatientQuery("");

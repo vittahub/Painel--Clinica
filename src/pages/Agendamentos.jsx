@@ -146,11 +146,11 @@ const Agendamentos = () => {
                   <div className="mt-6 flex items-center justify-between">
                     <div className="text-sm text-gray-500">
                       <span className="font-medium">Horário:</span>{" "}
-                      {doctor.workingHours.startTime} -{" "}
-                      {doctor.workingHours.endTime}
+                      {doctor.workingHours?.startTime || "08:00"} -{" "}
+                      {doctor.workingHours?.endTime || "18:00"}
                       <br />
                       <span className="font-medium">Intervalo:</span>{" "}
-                      {doctor.workingHours.interval}min
+                      {doctor.workingHours?.interval || 30}min
                     </div>
 
                     <Button
@@ -382,13 +382,11 @@ const Agendamentos = () => {
                                   setShowPatientSuggestions(false);
                                 }}
                               >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium text-gray-900">
-                                    {p.name}
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {p.cpf}
-                                  </span>
+                                <div className="font-medium text-gray-900">
+                                  {p.name}
+                                </div>
+                                <div className="text-sm text-gray-600 font-mono">
+                                  {p.cpf}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   {p.phone}
@@ -562,13 +560,11 @@ const Agendamentos = () => {
                                   setShowPatientSuggestions(false);
                                 }}
                               >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium text-gray-900">
-                                    {p.name}
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {p.cpf}
-                                  </span>
+                                <div className="font-medium text-gray-900">
+                                  {p.name}
+                                </div>
+                                <div className="text-sm text-gray-600 font-mono">
+                                  {p.cpf}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   {p.phone}

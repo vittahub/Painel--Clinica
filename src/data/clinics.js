@@ -46,3 +46,4 @@ export const getCurrentClinicId = () => {
 export const setCurrentClinicId = (id) => {
   save(CURRENT_CLINIC_KEY, id);
 };
+

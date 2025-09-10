@@ -69,7 +69,18 @@ const stored = loadPatientsFromStorage();
 if (!stored) {
   savePatientsToStorage(patients);
 } else {
+  // Mesclar dados do localStorage com dados padrão
+  const defaultPatients = patients;
   patients = stored;
+
+  // Garantir que todos os pacientes tenham CPF (mesclar com dados padrão se necessário)
+  patients.forEach((patient, index) => {
+    if (!patient.cpf && defaultPatients[index]) {
+      patient.cpf = defaultPatients[index].cpf;
+    }
+  });
+
+  savePatientsToStorage(patients);
 }
 
 export const getPatientById = (id) => {

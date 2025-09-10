@@ -122,7 +122,7 @@ export const generateAgendaSlots = (doctorId, date) => {
   ];
   const currentDay = dayNames[dayOfWeek];
 
-  if (!workingHours.workingDays.includes(currentDay)) {
+  if (!workingHours.workingDays?.includes(currentDay)) {
     return []; // Não trabalha neste dia
   }
 

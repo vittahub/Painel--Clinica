@@ -133,11 +133,11 @@ const Medicos = () => {
                   <div className="mt-6 flex items-center justify-between">
                     <div className="text-sm text-gray-500">
                       <span className="font-medium">Horário:</span>{" "}
-                      {doctor.workingHours.startTime} -{" "}
-                      {doctor.workingHours.endTime}
+                      {doctor.workingHours?.startTime || "08:00"} -{" "}
+                      {doctor.workingHours?.endTime || "18:00"}
                       <br />
                       <span className="font-medium">Intervalo:</span>{" "}
-                      {doctor.workingHours.interval}min
+                      {doctor.workingHours?.interval || 30}min
                     </div>
 
                     <div className="flex items-center space-x-2">
